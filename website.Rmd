@@ -1,0 +1,169 @@
+---
+title: Analiza liczby osób uprawiających sporty drużynowe w sekcjach sportowych.
+date: "21 maj 2020"
+output:
+  prettydoc::html_pretty:
+    highlight: github
+    number_sections: yes
+    theme: tactile
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Korzystamy z :
+
+1. Środowiska R oraz programu Rstudio.
+2. Biblioteki Rmarkdown.
+3. Danych Głównego Urzędu Statystycznego.
+
+
+# Praca z Tabelami
+
+## Podczytanie danych z Dysku, plik z programu Excel. 
+
+Zaczynamy od wyczyszczenia środowiska R ze wszystkich zmiennych oraz podczytania biblioteki **readxl**. 
+
+```{r czyszczenie_danych}
+rm(list = ls())
+```
+
+```{r potrzebna_biblioteka}
+library(readxl)
+```
+
+Importujemy dane z pliku **xlsx** poleceniem **read_excel**. Niestesty strona Głównego Urzędu Statystycznego nie udostępnia linków bezpośrednich do pobrania danych, stąd niemożliwe jest pobranie pliku bezpośrednio ze środowiska **R**.
+```{r Tabela, message=FALSE, warning=FALSE}
+Dane <- read_excel("KULT_2159_XPIV.xlsx", 
+    sheet = "DANE", col_types = c("text", 
+       "text", "text", "text", "numeric", 
+       "numeric", "text", "numeric"))
+head(Dane)
+
+```
+
+-----
+
+## Porządkowanie
+
+Aby uporządkować dane i ładnie wyświetlić tabelę, niezbędne są dwie biblioteki **dplry** oraz **DT**.
+```{r bibl, message=FALSE, warning=FALSE}
+library(dplyr)
+library(DT)
+```
+
+
+Następnie tworzymy nową tabelę bez niepotrzebnych kolumn poleceniem **select**, tworząc także prostą tabelę ze wszystkimi naszymi danymi poleceniem **datatable**. Zamieniamy od razu typ danych w kolumnach *Nazwa* i *Gry.zespolowe*, ponieważ będzie nam to potrzebne do dalszej analizy.
+
+```{r select, paged.print=TRUE}
+tmp <- select(Dane, Nazwa, Gry.zespolowe, Rok, Wartosc)
+tmp$Nazwa <- as.factor(tmp$Nazwa)
+tmp$Gry.zespolowe <- as.factor(tmp$Gry.zespolowe)
+tmp %>% datatable
+```
+
+-----
+
+## Zapis
+
+Tak przekształconą Tabelę możemy zapisać na dysku poleceniem **save**, aby nie powtarzać już tej czynności.
+```{r zapis}
+save(tmp, file = "Gry_zesp.RData")
+```
+
+-----
+
+## Zamiana danych na postać szeroką. 
+
+Do tej operacji potrzebna będzie bibloteka **reshape2**.
+```{r bibl_re2}
+library(reshape2)
+```
+
+Poleceniem **dcast** zamieniamy postać naszych danych oraz wyświetlamy gotową tablice.
+
+```{r long_type}
+Last <- dcast(tmp, 
+    Nazwa + Gry.zespolowe ~ Rok,
+    value.var = "Wartosc")
+Last %>% datatable
+```
+
+## Podsumowanie
+
+Zróbmy teraz małe podsumowanie tych liczb.
+
+```{r summary}
+Last %>% summary
+```
+
+----- 
+
+# Rysowanie wykresów.
+
+-----
+
+Wykonamy teraz wykres z całego kraju, który będzie nam służyć do porównania z wykresami poszczególnych województw.
+
+Do operacji tworzenia wykresów niezbędna będzie biblioteka **tidyverse** zawierająca **ggplot2**
+
+```{r ggplot2, message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+## Najpopularniejszy sport w kraju.
+
+Następnie przystępujemy do budowy zwykłego wykresu *punktowego*. W tym celu musimy wybrać z tabeli tylko Polskę jako region, za pomocą polecenie **fiter** aby przefiltrować całą tabelę po wierszach.
+
+```{r point_pol}
+tmp2 <- filter(tmp, Nazwa == "POLSKA")
+ggplot(tmp2, aes(tmp2,x=Rok, y = Wartosc, label = Gry.zespolowe)) + 
+  geom_point(color = "firebrick") + 
+  geom_label(fill = "firebrick4", colour = "white", fontface = "bold",hjust = 0.5, nudge_x = 0.5)+
+  ggtitle("Polski sport") +
+  scale_x_continuous(breaks = c(2014,2016,2018))
+  
+```
+
+-----
+
+
+## Porównanie na poziomie województw
+
+Używając funkcji **filter** odrzucimy sumę wyników z całego kraju aby porównać tylko województwa oraz wybierzemy tylko **piłkę nożną** jako sport, ponieważ tylko ona nas interesuje.
+
+
+```{r point_pol2}
+tmp3 <- filter(tmp, Nazwa != "POLSKA", Gry.zespolowe == "piłka nożna (łącznie z halową i plażową)")
+ggplot(tmp3, aes(tmp3, x=Rok, y = Wartosc, label = Nazwa)) +  
+geom_point(color = "firebrick") + 
+geom_label(fill = "firebrick4", colour = "white", fontface = "bold",hjust = 0.5, nudge_x = 0.5) +
+ggtitle("Piłka nożna w województwach")+
+scale_x_continuous(breaks = c(2014,2016,2018))
+
+```
+
+-----
+
+## Na sam koniec można usunąć wszystkie otwarte biblioteki z całego środowiska, używając funkcji detach.
+
+```{r detach}
+detach(package:readxl)
+detach(package:dplyr)
+detach(package:DT)
+detach(package:tidyverse)
+detach(package:reshape2)
+```
+
+-----
+
+# Bibliografia
+
+- Bank Danych Lokalnych, Główny Urząd Statystyczny, 
+- Przewodnik po pakiecie R 4.0, P. Biecek, http://pbiecek.github.io/Przewodnik/index.html
+- R markdown Theme Gallery, https://www.datadreaming.org/post/r-markdown-theme-gallery/
+
+<div id="refs"></div>
